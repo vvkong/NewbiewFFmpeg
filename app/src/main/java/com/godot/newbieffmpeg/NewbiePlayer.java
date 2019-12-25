@@ -50,7 +50,6 @@ public class NewbiePlayer implements SurfaceHolder.Callback {
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-        Log.d("bad-boy", "surfaceChanged...., holder: " + holder);
         nativeSetSurface(holder.getSurface());
     }
 

@@ -3,3 +3,14 @@
 //
 
 #include "AudioChannel.h"
+
+
+void AudioChannel::doDecode() {
+
+}
+
+void AudioChannel::doFrame() {
+
+}
+
+

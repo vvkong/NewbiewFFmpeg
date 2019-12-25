@@ -12,4 +12,6 @@
 
 #define DELETE(p) if(p) { delete(p); p = NULL; }
 
+extern void printError(const char *msg, int code = 0);
+
 #endif //NEWBIEFFMPEG_COMMON_H

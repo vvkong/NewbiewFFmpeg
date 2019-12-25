@@ -2,17 +2,13 @@
 // Created by wangrenxing on 2019-12-24.
 //
 
-#include <pthread.h>
 #include "NewbiewFFmpeg.h"
+#include <pthread.h>
 
 extern "C" {
 #include "libavformat/avformat.h"
 #include "libavcodec/avcodec.h"
 #include "libavutil/imgutils.h"
-}
-
-static void printError(char *msg, int code = 0) {
-    LOGE("%s %s", msg, av_err2str(code));
 }
 
 NewbiewFFmpeg::NewbiewFFmpeg(const char* dataSource, JavaCallHelper* helper): helper(helper) {
@@ -26,6 +22,9 @@ NewbiewFFmpeg::~NewbiewFFmpeg() {
     if( dataSource ) {
         delete []dataSource;
         dataSource = NULL;
+    }
+    if( ifmtCtx ) {
+        avformat_close_input(&ifmtCtx);
     }
     LOGD("~NewbiewFFmpeg helper: %#x, videoChannel: %#x", helper, videoChannel);
     DELETE(helper)
@@ -54,7 +53,6 @@ void NewbiewFFmpeg::_prepare() {
 
     int ret;
     // 打开文件
-    AVFormatContext* ifmtCtx = NULL;
     if( (ret=avformat_open_input(&ifmtCtx, dataSource, NULL, NULL)) < 0 ) {
         printError("avformat_open_input fail", ret);
         helper->onError(ERR_OPEN_INPUT, false);
@@ -82,13 +80,20 @@ void NewbiewFFmpeg::_prepare() {
             helper->onError(ERR_CODEC_ALLOC_CONTEXT, false);
             return;
         }
+        if( (ret=avcodec_parameters_to_context(ctx, stream->codecpar)) < 0 ) {
+            printError("avcodec_parameters_to_context fail", ret);
+            helper->onError(ERR_PARAMETERS_TO_CONTEXT, false);
+            return;
+        }
         if( (ret=avcodec_open2(ctx, codec, NULL)) < 0 ) {
             printError("avcodec_open2 fail", ret);
             helper->onError(ERR_CODEC_OPEN, true);
+            return;
         }
 
         if( AVMEDIA_TYPE_VIDEO == stream->codecpar->codec_type ) {
             videoChannel = new VideoChannel(ctx, i);
+            videoChannel->setRenderFunction(renderFunction);
         } else if( AVMEDIA_TYPE_AUDIO == stream->codecpar->codec_type ) {
         } else {
         }
@@ -98,6 +103,53 @@ void NewbiewFFmpeg::_prepare() {
         printError("couldn't find video and audio.");
         helper->onError(ERR_NOT_FIND_VIDEO_AND_AUDIO, false);
     }
-
     helper->onPrepared(false);
 }
+
+static void* startFun(void* args) {
+    NewbiewFFmpeg* ffmpeg = static_cast<NewbiewFFmpeg *>(args);
+    ffmpeg->_start();
+    return 0;
+}
+
+void NewbiewFFmpeg::start() {
+    if( !isPlaying && (videoChannel || audioChannel) ) {
+        isPlaying = true;
+        if( videoChannel ) {
+            videoChannel->start();
+        }
+        if( audioChannel ) {
+            audioChannel->start();
+        }
+        pthread_t pt;
+        pthread_create(&pt, NULL, startFun, this);
+    }
+}
+
+void NewbiewFFmpeg::_start() {
+    int ret;
+    int videoPacketCount = 0;
+    while( isPlaying ) {
+        AVPacket *pkt = av_packet_alloc();
+        if( (ret=av_read_frame(ifmtCtx, pkt)) == 0 ) {
+            if( videoChannel && pkt->stream_index == videoChannel->getStreamIdx() ) {
+                ++videoPacketCount;
+                videoChannel->pushPacket(pkt);
+            } else {
+                av_packet_free(&pkt);
+            }
+        } else {
+            av_packet_free(&pkt);
+            break;
+        }
+    }
+    LOGD("=========videoPacketCount: %d", videoPacketCount);
+}
+
+void NewbiewFFmpeg::setRenderFunction(void (*fun)(uint8_t *, int, int, int)) {
+    this->renderFunction = fun;
+    if( videoChannel ) {
+        videoChannel->setRenderFunction(fun);
+    }
+}
+

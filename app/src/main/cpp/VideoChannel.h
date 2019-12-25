@@ -6,15 +6,32 @@
 #define NEWBIEFFMPEG_VIDEOCHANNEL_H
 
 #include "BaseChannel.h"
-
+extern "C" {
+#include "libswscale/swscale.h"
+};
 class VideoChannel: public BaseChannel {
 
 public:
-    VideoChannel(AVCodecContext* codecContext, int streamIdx): BaseChannel(codecContext, streamIdx) {
+    typedef void (*RenderFunction)(uint8_t* data, int linesize, int w, int h);
+private:
+    SwsContext* swsContext = NULL;
+    RenderFunction renderFunction = NULL;
 
+public:
+    VideoChannel(AVCodecContext* codecContext, int streamIdx): BaseChannel(codecContext, streamIdx) {
+        swsContext = sws_getContext(codecContext->width, codecContext->height, codecContext->pix_fmt,
+                codecContext->width, codecContext->height, AV_PIX_FMT_RGBA,
+                SWS_BILINEAR, NULL, NULL, NULL);
     }
     ~VideoChannel() {
-        BaseChannel::~BaseChannel();
+        if( swsContext ) {
+            sws_freeContext(swsContext);
+        }
     }
+
+    void setRenderFunction(void (*renderFunction)(uint8_t *, int, int, int));
+
+    void doDecode();
+    void doFrame();
 };
 #endif //NEWBIEFFMPEG_VIDEOCHANNEL_H

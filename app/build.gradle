@@ -12,7 +12,7 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         externalNativeBuild {
             cmake {
-                cppFlags "-std=c++11 -Wno-error=format-security"
+                cppFlags "-std=c++14 -Wno-error=format-security -w"
                 abiFilters 'armeabi-v7a'
             }
         }

@@ -48,8 +48,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void play() {
-        String uri = "https://www.apple.com/105/media/us/iphone-x/2017/01df5b43-28e4-4848-bf20-490c34a926a7/films/feature/iphone-x-feature-tpl-cc-us-20170912_1920x1080h.mp4";
-//        String uri = "/sdcard/avtest/test.mp4";
+//        String uri = "https://www.apple.com/105/media/us/iphone-x/2017/01df5b43-28e4-4848-bf20-490c34a926a7/films/feature/iphone-x-feature-tpl-cc-us-20170912_1920x1080h.mp4";
+        String uri = "/sdcard/avtest/test.mp4";
 //        String uri = "http://ivi.bupt.edu.cn/hls/cctv1hd.m3u8";
         startActivity(PlayerActivity.buildIntent(this, uri));
     }
