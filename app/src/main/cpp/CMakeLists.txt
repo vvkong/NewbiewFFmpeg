@@ -55,6 +55,6 @@ target_link_libraries( # Specifies the target library.
 
         # Links the target library to the log library
         # included in the NDK.
-        avformat-58 avcodec-58 avutil-56 avfilter-7 swscale-5 ${log-lib} android jnigraphics)
+        avformat-58 avcodec-58 avutil-56 avfilter-7 swscale-5 swresample-3 OpenSLES ${log-lib} android jnigraphics)
 
 target_include_directories(newbieplayer PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include/ffmpeg")

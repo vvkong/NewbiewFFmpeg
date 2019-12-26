@@ -19,7 +19,7 @@ private:
     pthread_mutex_t mutex;
     pthread_cond_t cond;
     ReleaseHandler releaseHandler = NULL;
-    bool working = true;
+    bool working = false;
 
     SyncHandler syncHandler = NULL;
 
@@ -33,6 +33,7 @@ public:
         clear();
         pthread_mutex_destroy(&mutex);
         pthread_cond_destroy(&cond);
+        LOGD(" ~SafeQueue %s", "");
     }
 
     void clear() {

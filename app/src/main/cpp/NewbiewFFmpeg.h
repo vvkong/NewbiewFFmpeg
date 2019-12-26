@@ -9,6 +9,8 @@
 #include "common.h"
 #include "VideoChannel.h"
 #include "JavaCallHelper.h"
+#include "AudioChannel.h"
+
 extern "C" {
 #include "libavformat/avformat.h"
 };
@@ -19,7 +21,7 @@ private:
     JavaCallHelper* helper;
     AVFormatContext* ifmtCtx = NULL;
     VideoChannel* videoChannel = NULL;
-    VideoChannel* audioChannel = NULL;
+    AudioChannel* audioChannel = NULL;
     VideoChannel::RenderFunction renderFunction = NULL;
     bool isPlaying = false;
 public:

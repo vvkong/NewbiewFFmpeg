@@ -27,11 +27,12 @@ public:
         if( swsContext ) {
             sws_freeContext(swsContext);
         }
+        LOGD(" ~VideoChannel %s", "");
     }
 
     void setRenderFunction(void (*renderFunction)(uint8_t *, int, int, int));
 
-    void doDecode();
+protected:
     void doFrame();
 };
 #endif //NEWBIEFFMPEG_VIDEOCHANNEL_H

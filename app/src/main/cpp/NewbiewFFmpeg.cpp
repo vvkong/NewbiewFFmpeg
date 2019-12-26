@@ -28,6 +28,7 @@ NewbiewFFmpeg::~NewbiewFFmpeg() {
     }
     LOGD("~NewbiewFFmpeg helper: %#x, videoChannel: %#x", helper, videoChannel);
     DELETE(helper)
+    DELETE(audioChannel)
     DELETE(videoChannel)
 }
 
@@ -95,6 +96,7 @@ void NewbiewFFmpeg::_prepare() {
             videoChannel = new VideoChannel(ctx, i);
             videoChannel->setRenderFunction(renderFunction);
         } else if( AVMEDIA_TYPE_AUDIO == stream->codecpar->codec_type ) {
+            audioChannel = new AudioChannel(ctx, i);
         } else {
         }
     }
@@ -135,7 +137,10 @@ void NewbiewFFmpeg::_start() {
             if( videoChannel && pkt->stream_index == videoChannel->getStreamIdx() ) {
                 ++videoPacketCount;
                 videoChannel->pushPacket(pkt);
-            } else {
+            } else if( audioChannel && pkt->stream_index == audioChannel->getStreamIdx() ) {
+                audioChannel->pushPacket(pkt);
+            }
+            else {
                 av_packet_free(&pkt);
             }
         } else {

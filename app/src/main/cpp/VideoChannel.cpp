@@ -7,41 +7,6 @@ extern "C" {
 #include "libavutil/imgutils.h"
 }
 
-void VideoChannel::doDecode() {
-    int ret;
-    AVPacket* pkt;
-    AVFrame* frame;
-    int decodePacketCount = 0;
-    while( isPlaying ) {
-        if( packets.pop(pkt) ) {
-            LOGD("VideoChannel::decode....decodePacketCount: %d", ++decodePacketCount);
-            ret = avcodec_send_packet(codecContext, pkt);
-            if( ret < 0  ) {
-                printError("avcodec_send_packet fail.", ret);
-                av_packet_free(&pkt);
-                continue;
-            }
-            ret = 1;
-            LOGD("after send, %d", ret);
-            while( ret ) {
-                frame = av_frame_alloc();
-                ret = avcodec_receive_frame(codecContext, frame);
-                if( AVERROR(EAGAIN) == ret || AVERROR_EOF == ret ) {
-                    av_frame_free(&frame);
-                    break;
-                } else if( ret < 0 ) {
-                    av_frame_free(&frame);
-                    printError("avcodec_receive_frame fail.", ret);
-                    return;
-                }
-                LOGD("push frame, %d", frames.size());
-                frames.push(frame);
-            }
-        } else {
-        }
-    }
-}
-
 void VideoChannel::doFrame() {
     AVFrame* frame;
     uint8_t  *dstData[4];
@@ -56,15 +21,17 @@ void VideoChannel::doFrame() {
         return;
     }
     while( isPlaying ) {
-        LOGD("VideoChannel::doFrame....%d", frames.size());
-
         if( frames.pop(frame) ) {
+            if( !isPlaying ) {
+                av_frame_free(&frame);
+                break;
+            }
             sws_scale(swsContext, frame->data, frame->linesize, 0, frame->height,
                     dstData, dstLinesize);
             if( renderFunction ) {
                 renderFunction(dstData[0], dstLinesize[0], dstW, dstH);
+                usleep(16*1000);
             }
-            usleep(16*1000);
         }
     }
 
