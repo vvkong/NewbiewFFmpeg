@@ -22,6 +22,7 @@ private:
     SLObjectItf bqPlayerObject = NULL;
     SLPlayItf bqPlayerPlay;
     bool initOpenSLES();
+    bool initOpenSLES_2();
 
     SwrContext* swrContext = NULL;
     const int64_t out_ch_layout = AV_CH_LAYOUT_STEREO;
@@ -32,10 +33,11 @@ public:
     uint8_t* outBuf = NULL;
     SLAndroidSimpleBufferQueueItf bqPlayerBufferQueue;
     int getPcm();
+    double clock;
 
 public:
-    AudioChannel(AVCodecContext *codecContext, int streamIdx)
-            : BaseChannel(codecContext, streamIdx) {
+    AudioChannel(AVCodecContext *codecContext, int streamIdx,AVRational timeBase)
+            : BaseChannel(codecContext, streamIdx, timeBase) {
         swrContext = swr_alloc_set_opts(NULL, out_ch_layout, out_sample_fmt, out_sample_rate,
                 codecContext->channel_layout, codecContext->sample_fmt, codecContext->sample_rate,
                 0, NULL);

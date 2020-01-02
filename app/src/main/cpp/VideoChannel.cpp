@@ -5,6 +5,7 @@
 #include <unistd.h>
 extern "C" {
 #include "libavutil/imgutils.h"
+#include <libavutil/time.h>
 }
 
 void VideoChannel::doFrame() {
@@ -26,15 +27,42 @@ void VideoChannel::doFrame() {
                 av_frame_free(&frame);
                 break;
             }
-            sws_scale(swsContext, frame->data, frame->linesize, 0, frame->height,
-                    dstData, dstLinesize);
+            // 注意fps、timeBase直接取流里面的值
+            double fixDelay = 1 / fps;
+            double extraDelay = frame->repeat_pict / (2 * fps);
+            double delay = fixDelay + extraDelay;
+
+            double clock = frame->best_effort_timestamp * av_q2d(timeBase);
+
+            LOGD("======= 等待, audio clock: %f, video clock: %f", audioChannel->clock, clock);
+
+            if( clock > 0 && audioChannel ) {
+                if( audioChannel->clock > clock ) {
+                    // 丢帧加速前进
+                    if( fabs(audioChannel->clock - clock) > 0.05 ) {
+                        LOGD("======= 丢帧, %s", "");
+                        av_frame_free(&frame);
+                        frames.sync();
+                        continue;
+                    } else {
+                        delay = 0;
+                    }
+                } else {
+                    delay += (clock - audioChannel->clock);
+                    LOGD("======= 等待, delay: %lf", delay);
+                }
+            }
+            if( delay > 0 ) {
+                av_usleep(delay*1000000);
+            }
+
+            sws_scale(swsContext, frame->data, frame->linesize, 0, frame->height, dstData, dstLinesize);
             if( renderFunction ) {
                 renderFunction(dstData[0], dstLinesize[0], dstW, dstH);
-                usleep(16*1000);
             }
+            av_frame_free(&frame);
         }
     }
-
     av_free(dstData[0]);
 }
 

@@ -93,10 +93,17 @@ void NewbiewFFmpeg::_prepare() {
         }
 
         if( AVMEDIA_TYPE_VIDEO == stream->codecpar->codec_type ) {
-            videoChannel = new VideoChannel(ctx, i);
+            double fps = av_q2d(stream->avg_frame_rate);
+            videoChannel = new VideoChannel(ctx, i, stream->time_base, fps);
+            if( audioChannel ) {
+                videoChannel->setAudioChannel(audioChannel);
+            }
             videoChannel->setRenderFunction(renderFunction);
         } else if( AVMEDIA_TYPE_AUDIO == stream->codecpar->codec_type ) {
-            audioChannel = new AudioChannel(ctx, i);
+            audioChannel = new AudioChannel(ctx, i, stream->time_base);
+            if( videoChannel ) {
+                videoChannel->setAudioChannel(audioChannel);
+            }
         } else {
         }
     }

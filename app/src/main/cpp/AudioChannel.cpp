@@ -3,8 +3,9 @@
 //
 
 #include "AudioChannel.h"
-
-
+extern "C" {
+#include "libavutil/time.h"
+}
 // this callback handler is called every time a buffer finishes playing
 void bqPlayerCallback(SLAndroidSimpleBufferQueueItf bq, void *context) {
     LOGD("bqPlayerCallback.....%s","");
@@ -12,15 +13,109 @@ void bqPlayerCallback(SLAndroidSimpleBufferQueueItf bq, void *context) {
     int size = audioChannel->getPcm();
     //LOGD("getPcm(): %d", size);
     if( size > 0 ) {
-        SLresult result = (*bq)->Enqueue(bq, audioChannel->outBuf, size / 2);
+        SLresult result = (*bq)->Enqueue(bq, audioChannel->outBuf, size );
         if (SL_RESULT_SUCCESS != result) {
         }
     }
 }
+
+bool AudioChannel::initOpenSLES_2() {
+    /**
+     * 1、创建引擎并获取引擎接口
+     */
+    SLresult result;
+    // 1.1 创建引擎 SLObjectItf engineObject
+    result = slCreateEngine(&engineObject, 0, NULL, 0, NULL, NULL);
+    if (SL_RESULT_SUCCESS != result) {
+        return false;
+    }
+    // 1.2 初始化引擎  init
+    result = (*engineObject)->Realize(engineObject, SL_BOOLEAN_FALSE);
+    if (SL_RESULT_SUCCESS != result) {
+        return false;
+    }
+    // 1.3 获取引擎接口SLEngineItf engineInterface
+    result = (*engineObject)->GetInterface(engineObject, SL_IID_ENGINE,
+                                           &engineEngine);
+    if (SL_RESULT_SUCCESS != result) {
+        return false;
+    }
+
+    /**
+     * 2、设置混音器
+     */
+    // 2.1 创建混音器SLObjectItf outputMixObject
+    result = (*engineEngine)->CreateOutputMix(engineEngine, &outputMixObject, 0,
+                                                 0, 0);
+    if (SL_RESULT_SUCCESS != result) {
+        return false;
+    }
+    // 2.2 初始化混音器outputMixObject
+    result = (*outputMixObject)->Realize(outputMixObject, SL_BOOLEAN_FALSE);
+    if (SL_RESULT_SUCCESS != result) {
+        return false;
+    }
+
+    /**
+     * 3、创建播放器
+     */
+    //3.1 配置输入声音信息
+    //创建buffer缓冲类型的队列 2个队列
+    SLDataLocator_AndroidSimpleBufferQueue android_queue = {SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE,
+                                                            2};
+    //pcm数据格式
+    //pcm+2(双声道)+44100(采样率)+ 16(采样位)+16(数据的大小)+LEFT|RIGHT(双声道)+小端数据
+    SLDataFormat_PCM pcm = {SL_DATAFORMAT_PCM, 2, SL_SAMPLINGRATE_44_1, SL_PCMSAMPLEFORMAT_FIXED_16,
+                            SL_PCMSAMPLEFORMAT_FIXED_16,
+                            SL_SPEAKER_FRONT_LEFT | SL_SPEAKER_FRONT_RIGHT,
+                            SL_BYTEORDER_LITTLEENDIAN};
+
+    //数据源 将上述配置信息放到这个数据源中
+    SLDataSource slDataSource = {&android_queue, &pcm};
+
+    //3.2  配置音轨(输出)
+    //设置混音器
+    SLDataLocator_OutputMix outputMix = {SL_DATALOCATOR_OUTPUTMIX, outputMixObject};
+    SLDataSink audioSnk = {&outputMix, NULL};
+    //需要的接口  操作队列的接口
+    const SLInterfaceID ids[1] = {SL_IID_BUFFERQUEUE};
+    const SLboolean req[1] = {SL_BOOLEAN_TRUE};
+    //3.3 创建播放器
+    (*engineEngine)->CreateAudioPlayer(engineEngine, &bqPlayerObject, &slDataSource,
+                                          &audioSnk, 1,
+                                          ids, req);
+    //初始化播放器
+    (*bqPlayerObject)->Realize(bqPlayerObject, SL_BOOLEAN_FALSE);
+
+    //得到接口后调用  获取Player接口
+    (*bqPlayerObject)->GetInterface(bqPlayerObject, SL_IID_PLAY, &bqPlayerPlay);
+
+
+    /**
+     * 4、设置播放回调函数
+     */
+    //获取播放器队列接口
+    (*bqPlayerObject)->GetInterface(bqPlayerObject, SL_IID_BUFFERQUEUE,
+                                    &bqPlayerBufferQueue);
+    //设置回调
+    (*bqPlayerBufferQueue)->RegisterCallback(bqPlayerBufferQueue,
+                                                      bqPlayerCallback, this);
+    /**
+     * 5、设置播放状态
+     */
+    (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_PLAYING);
+    /**
+     * 6、手动激活一下这个回调
+     */
+    bqPlayerCallback(bqPlayerBufferQueue, this);
+    return true;
+}
+
 /**
  * 参考ndk-sample中native-audio工程代码实现
  * @return
  */
+
 bool AudioChannel::initOpenSLES() {
     SLresult result;
     // create engine
@@ -151,6 +246,7 @@ int AudioChannel::getPcm() {
         LOGD("AudioChannel frames.pop(frame) %s", "");
         if( !isPlaying ) {
             av_frame_free(&frame);
+            frame = NULL;
             return dataSize;
         }
         if( ret ) {
@@ -159,13 +255,17 @@ int AudioChannel::getPcm() {
             int sample = swr_convert(swrContext, (&outBuf), outCount,
                         const_cast<const uint8_t **>(frame->data), frame->nb_samples);
             dataSize = sample * 2 * 2;
+            clock = frame->pts * av_q2d(timeBase);
+
+            av_frame_free(&frame);
+            frame = NULL;
         }
     }
     return dataSize;
 
 }
 void AudioChannel::doFrame() {
-    if( initOpenSLES() ) {
+    if( initOpenSLES_2() ) {
         LOGD("initOpenSLES success.%s", "");
     } else {
         LOGD("initOpenSLES fail.%s", "");

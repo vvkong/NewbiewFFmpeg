@@ -77,8 +77,23 @@ public:
         if( working ) {
             q.push(value);
             pthread_cond_signal(&cond);
+        } else {
+            if( releaseHandler ) {
+                releaseHandler(value);
+            }
         }
         pthread_mutex_unlock(&mutex);
+    }
+
+    bool top(T& value) {
+        bool ret = false;
+        pthread_mutex_lock(&mutex);
+        if( !q.empty() ) {
+            value = q.front();
+            ret = true;
+        }
+        pthread_mutex_unlock(&mutex);
+        return ret;
     }
 
     /**

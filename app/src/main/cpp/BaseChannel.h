@@ -21,13 +21,14 @@ protected:
 public:
     SafeQueue<AVPacket*> packets;
     SafeQueue<AVFrame*> frames;
-
+    AVRational timeBase;
 public:
-    BaseChannel(AVCodecContext* codecContext, int streamIdx) {
+    BaseChannel(AVCodecContext* codecContext, int streamIdx, AVRational timeBase) {
         this->codecContext = codecContext;
         this->streamIdx = streamIdx;
         this->packets = SafeQueue<AVPacket*>(releasePktHandler);
         this->frames = SafeQueue<AVFrame*>(releaseFrameHandler);
+        this->timeBase = timeBase;
     }
 
     void pushPacket(AVPacket* packet) {

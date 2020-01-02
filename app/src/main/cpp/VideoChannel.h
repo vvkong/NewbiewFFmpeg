@@ -6,6 +6,8 @@
 #define NEWBIEFFMPEG_VIDEOCHANNEL_H
 
 #include "BaseChannel.h"
+#include "AudioChannel.h"
+
 extern "C" {
 #include "libswscale/swscale.h"
 };
@@ -16,12 +18,26 @@ public:
 private:
     SwsContext* swsContext = NULL;
     RenderFunction renderFunction = NULL;
-
+    AudioChannel* audioChannel = NULL;
+    double fps;
+    static void dropFrame(queue<AVFrame*>* frames) {
+        if( frames ) {
+            if(!frames->empty()) {
+                AVFrame* frame = frames->front();
+                if( frame ) {
+                    frames->pop();
+                    av_frame_free(&frame);
+                }
+            }
+        }
+    }
 public:
-    VideoChannel(AVCodecContext* codecContext, int streamIdx): BaseChannel(codecContext, streamIdx) {
+    VideoChannel(AVCodecContext* codecContext, int streamIdx, AVRational timeBase, double fps): BaseChannel(codecContext, streamIdx, timeBase) {
+        this->fps = fps;
         swsContext = sws_getContext(codecContext->width, codecContext->height, codecContext->pix_fmt,
                 codecContext->width, codecContext->height, AV_PIX_FMT_RGBA,
                 SWS_BILINEAR, NULL, NULL, NULL);
+        frames.setSyncHandler(dropFrame);
     }
     ~VideoChannel() {
         if( swsContext ) {
@@ -29,7 +45,9 @@ public:
         }
         LOGD(" ~VideoChannel %s", "");
     }
-
+    void setAudioChannel(AudioChannel* audioChannel) {
+        this->audioChannel = audioChannel;
+    }
     void setRenderFunction(void (*renderFunction)(uint8_t *, int, int, int));
 
 protected:
